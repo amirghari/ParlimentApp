@@ -4,23 +4,18 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -31,6 +26,9 @@ import com.example.parlimentapp.data.ParliamentMembersData
 import com.example.parlimentapp.ui.theme.ParlimentAppTheme
 
 class MainActivity : ComponentActivity() {
+
+    private val viewModel: ParliamentViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -38,9 +36,8 @@ class MainActivity : ComponentActivity() {
             ParlimentAppTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                )
-                {
-                    ParliamentApp()
+                ) {
+                    ParliamentApp(viewModel = viewModel)
                 }
             }
         }
@@ -48,33 +45,33 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun ParliamentApp(modifier: Modifier = Modifier) {
-    var pageNumber by remember { mutableStateOf(1) }
-    var partyName by remember { mutableStateOf("") }
-    var member by remember { mutableStateOf("") }
-    when (pageNumber) {
+fun ParliamentApp(viewModel: ParliamentViewModel) {
+    when (viewModel.pageNumber.value) {
         1 -> {
             FirstScreen(
                 modifier = Modifier,
-                onClick = { pageNumber = 2 },
-                onValueChange = { partyName = it }
+                onClick = { viewModel.updatePageNumber(2) },
+                onValueChange = { viewModel.updatePartyName(it) },
+                parties = viewModel.getParties()
             )
         }
 
         2 -> {
             SecondScreen(
                 modifier = Modifier,
-                onClick = { pageNumber = 3 },
-                partyName = partyName,
-                onValueChange = { member = it }
+                onClick = { viewModel.updatePageNumber(3) },
+                partyName = viewModel.partyName.value,
+                onValueChange = { viewModel.updateMemberName(it) },
+                members = viewModel.getMembersByParty(viewModel.partyName.value)
             )
         }
 
         3 -> {
             ThirdScreen(
                 modifier = Modifier,
-                onClick = { pageNumber = 1 },
-                member = member
+                onClick = { viewModel.updatePageNumber(1) },
+                member = viewModel.member.value,
+                targetMember = viewModel.getMemberDetails(viewModel.member.value)
             )
         }
     }
@@ -84,9 +81,9 @@ fun ParliamentApp(modifier: Modifier = Modifier) {
 fun FirstScreen(
     modifier: Modifier,
     onClick: () -> Unit,
-    onValueChange: (String) -> Unit
+    onValueChange: (String) -> Unit,
+    parties: Set<String>
 ) {
-    val parties: Set<String> = ParliamentMembersData.members.map { it.party }.toSet()
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -102,7 +99,7 @@ fun FirstScreen(
         Spacer(modifier = modifier.padding(10.dp))
 
         parties.forEach { party ->
-            Button(
+            Card(
                 onClick = {
                     onClick()
                     onValueChange(party)
@@ -110,22 +107,36 @@ fun FirstScreen(
                 modifier = modifier
                     .align(Alignment.CenterHorizontally)
                     .padding(vertical = 10.dp)
+                    .width(200.dp)
+                    .height(50.dp)
             ) {
-                Text(text = party)
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = party,
+                        style = androidx.compose.ui.text.TextStyle(
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
+                    )
+                }
             }
         }
     }
 }
 
-@Composable
+
+            @Composable
 fun SecondScreen(
     modifier: Modifier,
     onClick: () -> Unit,
     partyName: String,
-    onValueChange: (String) -> Unit
+    onValueChange: (String) -> Unit,
+    members: List<ParliamentMembersData.ParliamentMember>
 ) {
-    val members =
-        ParliamentMembersData.members.filter { it.party == partyName }.sortedBy { it.lastname }
     val scrollState = rememberScrollState()
     Column(
         modifier = Modifier
@@ -170,10 +181,9 @@ fun SecondScreen(
 fun ThirdScreen(
     modifier: Modifier,
     onClick: () -> Unit,
-    member: String
+    member: String,
+    targetMember: ParliamentMembersData.ParliamentMember?
 ) {
-    val targetMember = ParliamentMembersData.members.find { it.lastname == member }
-
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
