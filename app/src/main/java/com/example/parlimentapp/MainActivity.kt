@@ -1,22 +1,25 @@
 package com.example.parlimentapp
 
+import android.annotation.SuppressLint
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -24,23 +27,140 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.parlimentapp.data.ParliamentMembersData
+import androidx.core.view.WindowCompat
+
+import com.example.parlimentapp.data.database.ParliamentDatabase
+import com.example.parlimentapp.data.entity.ParliamentMemberEntity
+import com.example.parlimentapp.network.NetworkModule
 import com.example.parlimentapp.ui.theme.ParlimentAppTheme
 
+
+
 class MainActivity : ComponentActivity() {
+
+    private val viewModel: ParliamentViewModel by viewModels {
+        val database = ParliamentDatabase.getDatabase(applicationContext)
+        val apiService = NetworkModule.apiService
+        ParliamentViewModelFactory(database.parliamentMemberDao(), apiService)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+
         setContent {
             ParlimentAppTheme {
-                Surface(
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    ParliamentApp(viewModel = viewModel)
+                }
+            }
+        }
+    }
+}
+
+@SuppressLint("StateFlowValueCalledInComposition")
+@Composable
+fun ParliamentApp(viewModel: ParliamentViewModel) {
+    LaunchedEffect(Unit) {
+        viewModel.fetchAndSaveMembersIfNeeded()
+    }
+    val pageNumber = viewModel.pageNumber.collectAsState()
+    Log.d("UI", "Current page number: ${pageNumber.value}")
+    when (pageNumber.value) {
+        1 -> {
+            val partiesState = viewModel.parties.collectAsState(initial = emptySet())
+            LaunchedEffect(Unit) {
+                viewModel.getParties()  // Fetch parties when on page 1
+            }
+            FirstScreen(
+                onClick = { viewModel.updatePageNumber(2) },
+                onValueChange = { viewModel.updatePartyName(it) },
+                parties = partiesState.value
+            )
+        }
+        2 -> {
+            val membersState = viewModel.members.collectAsState(initial = emptyList())
+            LaunchedEffect(viewModel.partyName.value) {
+                viewModel.getMembersByParty(viewModel.partyName.value)  // Fetch members for the selected party
+            }
+            SecondScreen(
+                onClick = { viewModel.updatePageNumber(3) },
+                partyName = viewModel.partyName.value,
+                onValueChange = { viewModel.updateMemberName(it) },
+                members = membersState.value
+            )
+        }
+        3 -> {
+            val memberDetails = viewModel.targetMember.collectAsState(initial = null)
+            LaunchedEffect(viewModel.selectedMemberName.value) {
+                viewModel.getMemberDetails(viewModel.selectedMemberName.value)  // Fetch selected member details
+            }
+            ThirdScreen(
+                onClick = { viewModel.updatePageNumber(1) },
+                targetMember = memberDetails.value,
+                updateMember = { updatedMember ->
+                    // Call the ViewModel function to update the member in the database
+                    viewModel.updateMember(updatedMember)
+                }
+            )
+        }
+    }
+
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun FirstScreen(
+    onClick: () -> Unit,
+    onValueChange: (String) -> Unit,
+    parties: Set<String>,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Top
+    ) {
+        Spacer(modifier = Modifier.height(70.dp))
+        Text(
+            text = "Select a party:",
+            style = TextStyle(
+                fontSize = 30.sp,
+                fontWeight = FontWeight.Bold
+            )
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+
+        parties.forEach { party ->
+            Card(
+                onClick = {
+                    onClick()
+                    onValueChange(party)
+                },
+                modifier = Modifier
+                    .padding(vertical = 10.dp)
+                    .width(200.dp)
+                    .height(50.dp)
+            ) {
+                Box(
                     modifier = Modifier.fillMaxSize(),
-                )
-                {
-                    ParliamentApp()
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = party,
+                        style = TextStyle(
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
+                    )
                 }
             }
         }
@@ -48,138 +168,71 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun ParliamentApp(modifier: Modifier = Modifier) {
-    var pageNumber by remember { mutableStateOf(1) }
-    var partyName by remember { mutableStateOf("") }
-    var member by remember { mutableStateOf("") }
-    when (pageNumber) {
-        1 -> {
-            FirstScreen(
-                modifier = Modifier,
-                onClick = { pageNumber = 2 },
-                onValueChange = { partyName = it }
-            )
-        }
-
-        2 -> {
-            SecondScreen(
-                modifier = Modifier,
-                onClick = { pageNumber = 3 },
-                partyName = partyName,
-                onValueChange = { member = it }
-            )
-        }
-
-        3 -> {
-            ThirdScreen(
-                modifier = Modifier,
-                onClick = { pageNumber = 1 },
-                member = member
-            )
-        }
-    }
-}
-
-@Composable
-fun FirstScreen(
-    modifier: Modifier,
-    onClick: () -> Unit,
-    onValueChange: (String) -> Unit
-) {
-    val parties: Set<String> = ParliamentMembersData.members.map { it.party }.toSet()
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(
-            text = "Select a party: ",
-            style = androidx.compose.ui.text.TextStyle(
-                fontSize = 30.sp,
-                fontWeight = FontWeight.Bold
-            )
-        )
-        Spacer(modifier = modifier.padding(10.dp))
-
-        parties.forEach { party ->
-            Button(
-                onClick = {
-                    onClick()
-                    onValueChange(party)
-                },
-                modifier = modifier
-                    .align(Alignment.CenterHorizontally)
-                    .padding(vertical = 10.dp)
-            ) {
-                Text(text = party)
-            }
-        }
-    }
-}
-
-@Composable
 fun SecondScreen(
-    modifier: Modifier,
     onClick: () -> Unit,
     partyName: String,
-    onValueChange: (String) -> Unit
+    onValueChange: (String) -> Unit,
+    members: List<ParliamentMemberEntity>,
+    modifier: Modifier = Modifier
 ) {
-    val members =
-        ParliamentMembersData.members.filter { it.party == partyName }.sortedBy { it.lastname }
     val scrollState = rememberScrollState()
     Column(
-        modifier = Modifier
+        modifier = modifier
             .verticalScroll(scrollState)
-            .fillMaxSize(),
+            .fillMaxSize()
+            .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
+        verticalArrangement = Arrangement.Top
     ) {
-        Spacer(modifier = modifier.padding(20.dp))
+        Spacer(modifier = Modifier.height(20.dp))
         Text(
-            "Members of $partyName party: ",
-            style = androidx.compose.ui.text.TextStyle(
+            text = "Members of $partyName party:",
+            style = TextStyle(
                 fontSize = 35.sp,
                 fontWeight = FontWeight.Bold
             )
         )
-        Spacer(modifier = modifier.padding(10.dp))
-        members.forEach {
+        Spacer(modifier = Modifier.height(10.dp))
+        members.forEach { member ->
             Button(
                 onClick = {
                     onClick()
-                    onValueChange(it.lastname)
+                    onValueChange(member.lastname)
                 },
-                modifier = modifier
+                modifier = Modifier
                     .padding(vertical = 5.dp)
-                    .align(Alignment.CenterHorizontally)
-                    .width(300.dp),
+                    .width(300.dp)
             ) {
                 Text(
-                    text = "${it.firstname} ${it.lastname}",
-                    style = androidx.compose.ui.text.TextStyle(
+                    text = "${member.firstname} ${member.lastname}",
+                    style = TextStyle(
                         fontSize = 20.sp
                     )
                 )
-                Spacer(modifier = modifier.padding(5.dp))
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ThirdScreen(
-    modifier: Modifier,
     onClick: () -> Unit,
-    member: String
+    targetMember: ParliamentMemberEntity?,
+    updateMember: (ParliamentMemberEntity) -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    val targetMember = ParliamentMembersData.members.find { it.lastname == member }
+    var note by remember { mutableStateOf(targetMember?.note ?: "") }
+    var vote by remember { mutableStateOf(targetMember?.vote?.toFloat() ?: 0f) }
 
     Column(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier
+            .fillMaxSize()
+            .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.Top
     ) {
-        Spacer(modifier = modifier.padding(20.dp))
+        Spacer(modifier = modifier.padding(40.dp))
         Image(
             painter = painterResource(id = R.drawable.user),
             contentDescription = "UserAvatar",
@@ -225,5 +278,39 @@ fun ThirdScreen(
             Text(text = "Back")
         }
         Spacer(modifier = modifier.padding(20.dp))
+
+        // Input for Note
+        Spacer(modifier = Modifier.height(20.dp))
+        TextField(
+            value = note,
+            onValueChange = { note = it },
+            label = { Text(text = "Add a note") },
+            placeholder = { Text(text = "Enter your note here") },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        // Input for Vote
+        Spacer(modifier = Modifier.height(20.dp))
+        Text(text = "Vote: ${vote.toInt()}")
+        Slider(
+            value = vote,
+            onValueChange = { vote = it },
+            valueRange = 0f..10f,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+        Button(onClick = {
+            // Update the member entity with the new note and vote
+            val updatedMember = targetMember?.copy(note = note, vote = vote.toInt())
+            if (updatedMember != null) {
+                updateMember(updatedMember) // Call to update the member in the local database
+            }
+            onClick()
+        }) {
+            Text(text = "Save & Back")
+        }
     }
 }
+
+
