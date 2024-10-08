@@ -77,13 +77,14 @@ class ParliamentViewModel(
 
     fun getMemberDetails(memberLastName: String) {
         viewModelScope.launch {
-            Log.d(TAG, "getMemberDetails: Fetching details for member: $memberLastName")
+            Log.d(TAG, "Fetching details for member: $memberLastName")
             dao.getAllMembers().collect { membersList ->
                 _targetMember.value = membersList.find { it.lastname == memberLastName }
-                Log.d(TAG, "getMemberDetails: Target member: ${_targetMember.value}")
+                Log.d(TAG, "Target member: ${_targetMember.value}")
             }
         }
     }
+
     fun fetchAndSaveMembersIfNeeded() {
         viewModelScope.launch(Dispatchers.IO) {
             val members = dao.getAllMembers().first()  // Get the current members in the database
@@ -99,8 +100,11 @@ class ParliamentViewModel(
     fun updateMember(member: ParliamentMemberEntity) {
         viewModelScope.launch(Dispatchers.IO) {
             dao.updateMember(member)
+            Log.d(TAG, "Member updated with note: ${member.note}, vote: ${member.vote}")
         }
     }
+
+
 
 
 

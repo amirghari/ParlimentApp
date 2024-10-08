@@ -222,8 +222,17 @@ fun ThirdScreen(
     updateMember: (ParliamentMemberEntity) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var note by remember { mutableStateOf(targetMember?.note ?: "") }
-    var vote by remember { mutableStateOf(targetMember?.vote?.toFloat() ?: 0f) }
+    // State variables for note and vote
+    var note by remember { mutableStateOf("") }
+    var vote by remember { mutableStateOf(0f) }
+
+    // Update the state when the targetMember changes
+    LaunchedEffect(targetMember) {
+        if (targetMember != null) {
+            note = targetMember.note ?: ""  // Default to empty string if null
+            vote = targetMember.vote?.toFloat() ?: 0f  // Default to 0 if null
+        }
+    }
 
     Column(
         modifier = modifier
@@ -232,52 +241,47 @@ fun ThirdScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Top
     ) {
-        Spacer(modifier = modifier.padding(40.dp))
+        Spacer(modifier = Modifier.height(20.dp))
         Image(
             painter = painterResource(id = R.drawable.user),
-            contentDescription = "UserAvatar",
-            modifier = modifier.padding(20.dp)
+            contentDescription = "User Avatar",
+            modifier = Modifier.padding(20.dp)
         )
         Text(
-            text = "${targetMember?.firstname} ${targetMember?.lastname}",
-            style = androidx.compose.ui.text.TextStyle(
+            text = "${targetMember?.firstname ?: ""} ${targetMember?.lastname ?: ""}",
+            style = TextStyle(
                 fontSize = 40.sp,
                 fontWeight = FontWeight.Bold
             )
         )
-        Spacer(modifier = modifier.padding(20.dp))
+        Spacer(modifier = Modifier.height(20.dp))
         Text(
-            text = "Party: ${targetMember?.party}",
-            style = androidx.compose.ui.text.TextStyle(
+            text = "Party: ${targetMember?.party ?: "N/A"}",
+            style = TextStyle(
                 fontSize = 20.sp
             )
         )
-        Spacer(modifier = modifier.padding(5.dp))
+        Spacer(modifier = Modifier.height(5.dp))
         Text(
-            text = "Seat number: ${targetMember?.seatNumber}",
-            style = androidx.compose.ui.text.TextStyle(
+            text = "Seat number: ${targetMember?.seatNumber ?: "N/A"}",
+            style = TextStyle(
                 fontSize = 20.sp
             )
         )
-        Spacer(modifier = modifier.padding(5.dp))
+        Spacer(modifier = Modifier.height(5.dp))
         Text(
-            text = "Id number: ${targetMember?.hetekaId}",
-            style = androidx.compose.ui.text.TextStyle(
+            text = "Id number: ${targetMember?.hetekaId ?: "N/A"}",
+            style = TextStyle(
                 fontSize = 20.sp
             )
         )
-        Spacer(modifier = modifier.padding(5.dp))
+        Spacer(modifier = Modifier.height(5.dp))
         Text(
-            text = "Minister: ${targetMember?.minister}",
-            style = androidx.compose.ui.text.TextStyle(
+            text = "Minister: ${targetMember?.minister ?: "N/A"}",
+            style = TextStyle(
                 fontSize = 20.sp
             )
         )
-        Spacer(modifier = modifier.padding(20.dp))
-        Button(onClick = { onClick() }) {
-            Text(text = "Back")
-        }
-        Spacer(modifier = modifier.padding(20.dp))
 
         // Input for Note
         Spacer(modifier = Modifier.height(20.dp))
@@ -295,22 +299,20 @@ fun ThirdScreen(
         Slider(
             value = vote,
             onValueChange = { vote = it },
-            valueRange = 0f..10f,
+            valueRange = 0f..10f, // Assume votes are between 0 and 10
             modifier = Modifier.fillMaxWidth()
         )
 
         Spacer(modifier = Modifier.height(20.dp))
         Button(onClick = {
-            // Update the member entity with the new note and vote
             val updatedMember = targetMember?.copy(note = note, vote = vote.toInt())
             if (updatedMember != null) {
-                updateMember(updatedMember) // Call to update the member in the local database
+                updateMember(updatedMember)
             }
-            onClick()
+            onClick() // Navigate back to the previous screen
         }) {
             Text(text = "Save & Back")
         }
     }
 }
-
 

@@ -25,6 +25,8 @@ interface ParliamentMemberDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insertMember(member: ParliamentMemberEntity)
+
     @Update
-    fun updateMember(member: ParliamentMemberEntity)
+    fun updateMember(member: ParliamentMemberEntity): Int  // Returns the number of rows affected
+
 }
