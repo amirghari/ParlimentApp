@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.parlimentapp.data.dao.ParliamentMemberDao
 import com.example.parlimentapp.data.entity.ParliamentMemberEntity
+import com.example.parlimentapp.network.NetworkModule
 import com.example.parlimentapp.network.ParliamentApiService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -12,6 +13,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import okhttp3.ResponseBody
 
 class ParliamentViewModel(
     private val dao: ParliamentMemberDao,
@@ -106,8 +108,6 @@ class ParliamentViewModel(
 
 
 
-
-
     fun fetchAndSaveMembers() {
         viewModelScope.launch(Dispatchers.IO) {
             Log.d(TAG, "fetchAndSaveMembers: Starting to fetch members from the API")
@@ -120,6 +120,30 @@ class ParliamentViewModel(
                 Log.d(TAG, "fetchAndSaveMembers: Members successfully saved to the database")
             } catch (e: Exception) {
                 Log.e(TAG, "fetchAndSaveMembers: Error fetching members: ${e.message}", e)
+            }
+        }
+    }
+
+
+    fun fetchMemberImage(pictureUrl: String, onSuccess: (ResponseBody) -> Unit, onError: (String) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val fullUrl = "https://avoindata.eduskunta.fi/$pictureUrl"
+                val response = NetworkModule.imageApiService.getMemberImage(fullUrl)
+
+                if (response.isSuccessful && response.body() != null) {
+                    // Image fetched successfully, call onSuccess with the response body
+                    onSuccess(response.body()!!)
+                    Log.d(TAG, "Image fetched successfully from $fullUrl")
+                } else {
+                    // Handle the case where the response is not successful
+                    onError("Failed to fetch image: ${response.code()}")
+                    Log.e(TAG, "Failed to fetch image: ${response.code()}")
+                }
+            } catch (e: Exception) {
+                // Handle exceptions
+                onError("Error fetching image: ${e.message}")
+                Log.e(TAG, "Error fetching image: ${e.message}", e)
             }
         }
     }
