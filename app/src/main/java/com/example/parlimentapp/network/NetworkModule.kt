@@ -9,8 +9,6 @@ import java.util.concurrent.TimeUnit
 
 object NetworkModule {
 
-    private const val BASE_URL = "https://users.metropolia.fi/"  // Root URL
-
     // Create the logging interceptor
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
         setLevel(HttpLoggingInterceptor.Level.BODY)
@@ -19,16 +17,26 @@ object NetworkModule {
     // Create OkHttpClient and add the interceptor
     private val client = OkHttpClient.Builder()
         .addInterceptor(loggingInterceptor)
-        .connectTimeout(30, TimeUnit.SECONDS)  // Set timeout durations
+        .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
 
-    // Create Retrofit instance using the client
-    val apiService: ParliamentApiService = Retrofit.Builder()
-        .baseUrl(BASE_URL)
-        .client(client)
-        .addConverterFactory(GsonConverterFactory.create())
-        .build()
+    // Create Retrofit instance with a custom base URL
+    private fun createRetrofit(baseUrl: String): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl(baseUrl)
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+    }
+
+    // API service for the current base URL (https://users.metropolia.fi/)
+    val apiService: ParliamentApiService = createRetrofit("https://users.metropolia.fi/")
+        .create(ParliamentApiService::class.java)
+
+    // API service for the new base URL (https://avoindata.eduskunta.fi/)
+    val imageApiService: ParliamentApiService = createRetrofit("https://avoindata.eduskunta.fi/")
         .create(ParliamentApiService::class.java)
 }
+
 
